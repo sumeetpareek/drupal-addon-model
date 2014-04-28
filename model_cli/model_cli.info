@@ -1,0 +1,3 @@
+name = Model Command Line Tools
+description = Provides drush command to create custom entites using the model module
+core = 7.x
