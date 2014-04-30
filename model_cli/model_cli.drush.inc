@@ -39,41 +39,42 @@ function drush_model_cli_model_entity_create($entity_name = NULL) {
   $source_path = drush_normalize_path(drush_get_context('DRUSH_DRUPAL_ROOT') . '/' . drupal_get_path('module', 'model'));
   $destination_path = drush_normalize_path(drush_get_context('DRUSH_DRUPAL_ROOT'). '/sites/all/modules/' .$entity_name);
 
-  //TODO Just testing. Remove these.
-  drush_print("Copy from = ". $source_path);
-  drush_print("Copy to = ". $destination_path);
-
   // Make a copy of the model module, clean up unwanted files and rename things
-  // TODO Check later if it is possible to just read all filesnames, rename and replace automatically without doing the same work for each file separately below.
   drush_op('drush_copy_dir', $source_path, $destination_path);
   drush_op('drush_delete_dir', $destination_path .'/model_cli');
-  drush_op('rename', drush_normalize_path($destination_path .'/model.info'), 
-    drush_normalize_path($destination_path .'/'. $entity_name .'.info'));
-  drush_op('rename', drush_normalize_path($destination_path .'/model.install'), 
-    drush_normalize_path($destination_path .'/'. $entity_name .'.install'));
-  drush_op('rename', drush_normalize_path($destination_path .'/model.module'), 
-    drush_normalize_path($destination_path .'/'. $entity_name .'.module'));
-  drush_op('rename', drush_normalize_path($destination_path .'/model.admin.inc'), 
-    drush_normalize_path($destination_path .'/'. $entity_name .'.admin.inc'));
+  // See - http://api.drush.org/api/drush/includes%21filesystem.inc/function/drush_scan_directory/6.x
+  $files = drush_scan_directory(
+    $destination_path, //$path
+    '/model/', //$patern
+    array('.', '..', 'CVS'), //$nomask (default = array('.', '..', 'CVS'))
+    0, //$callback (default = 0)
+    TRUE, //$recurse_max_depth (default = TRUE)
+    'basename', //$key (default = 'filename')
+    0, //$min_depth (default = 0)
+    FALSE, //$include_dot_files (default = FALSE)
+    0 //$depth (default = 0)
+  );
+  foreach ($files as $key => $file) {
+    drush_op('file_rename_and_replace', $file, $entity_name);
+  }
 
-  drush_op('file_str_replace', drush_normalize_path($destination_path .'/'. $entity_name .'.info'), 'model', $entity_name);
-  drush_op('file_str_replace', drush_normalize_path($destination_path .'/'. $entity_name .'.install'), 'model', $entity_name);
-  drush_op('file_str_replace', drush_normalize_path($destination_path .'/'. $entity_name .'.module'), 'model', $entity_name);
-  drush_op('file_str_replace', drush_normalize_path($destination_path .'/'. $entity_name .'.admin.inc'), 'model', $entity_name);
-
-
-  //TODO Just testing. Remove this.
-  drush_log("Hello world says KAKA!", 'ok');
-
+  drush_log("A new module '$entity_name' created based on model entity", 'ok');
+  drush_print("You may now DISABLE the 'model_cli' module");
+  drush_print("You may now ENABLE the '$entity_name' module and make changes to it as desired");
 }
 
 /**
- * Replace strings in a file.
+ * Rename the file and replace upper and lower case strings
  */
-function file_str_replace($file_path, $find, $replace) {
-  $file_path = drush_normalize_path($file_path);
-  $file_contents = file_get_contents($file_path);
-  $file_contents = str_replace($find, $replace, $file_contents);
-  //TODO do the upper case conversion here
-  file_put_contents($file_path, $file_contents);
+function file_rename_and_replace($file, $entity_name) {
+  $filepath_old = $file->filename;
+  $filename_old = $file->basename;
+  $filename_new = str_replace('model', $entity_name, $filename_old);
+  $filepath_new = dirname($filepath_old)."/".$filename_new;
+
+  drush_op('rename', $filepath_old, $filepath_new);
+  $file_contents = file_get_contents($filepath_new);
+  $file_contents = str_replace('model', $entity_name, $file_contents);
+  $file_contents = str_replace('Model', ucfirst($entity_name), $file_contents);
+  file_put_contents($filepath_new, $file_contents);
 }
